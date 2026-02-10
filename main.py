@@ -6,7 +6,7 @@ from flask import Flask
 from threading import Thread
 
 # --- CONFIGURATION ---
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # Apna token yahan daalein
+TOKEN = "8215508330:AAH89E2yXIslUZDwb3gIkxgeHdEzLnR7EVk"  # Apna token yahan daalein
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 

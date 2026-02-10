@@ -2,7 +2,7 @@ import telebot
 import requests
 
 # 1. Setup: Apna Token yahan daalein
-BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+BOT_TOKEN = "8215508330:AAH89E2yXIslUZDwb3gIkxgeHdEzLnR7EVk"
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # 2. Score Fetching Function

@@ -1,72 +1,82 @@
-import os
-import requests
 import telebot
-from flask import Flask
+import requests
 
-# 1. Setup
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-bot = telebot.TeleBot(TOKEN)
-app = Flask(__name__)
+# 1. Setup: Apna Token yahan daalein
+BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+bot = telebot.TeleBot(BOT_TOKEN)
 
-# 2. Cricbuzz Data Fetcher Logic
-def get_live_scores():
+# 2. Score Fetching Function
+def fetch_cricbuzz_scores():
     url = "https://www.cricbuzz.com/api/home"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://www.cricbuzz.com/"
     }
+
     try:
         response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            messages = []
-            
-            # Sirf pehle 5 matches dikhayenge taaki message bahut bada na ho
-            for item in data.get('matches', [])[:5]:
-                m = item.get('match', {})
-                info = m.get('matchInfo', {})
-                score = m.get('matchScore', {})
-                
-                t1 = info.get('team1', {}).get('teamSName', 'T1')
-                t2 = info.get('team2', {}).get('teamSName', 'T2')
-                status = info.get('status', 'No Status')
-                
-                if score:
-                    # Score nikalne ka logic
-                    s1 = score.get('team1Score', {}).get('inngs1', {})
-                    s2 = score.get('team2Score', {}).get('inngs1', {})
-                    
-                    msg = (f"🏏 *{t1} vs {t2}*\n"
-                           f"🔹 {t1}: {s1.get('runs', 0)}/{s1.get('wickets', 0)} ({s1.get('overs', 0)})\n"
-                           f"🔹 {t2}: {s2.get('runs', 0)}/{s2.get('wickets', 0)} ({s2.get('overs', 0)})\n"
-                           f"📢 _{status}_\n")
-                else:
-                    msg = f"🕒 *{t1} vs {t2}*\n📢 _{status}_\n"
-                
-                messages.append(msg)
-            
-            return "\n---\n".join(messages) if messages else "No live matches found."
-        return "❌ Server se data nahi mila."
-    except Exception as e:
-        return f"⚠️ Error: {str(e)}"
+        if response.status_code != 200:
+            return "❌ API access nahi ho pa rahi hai."
 
-# 3. Bot Command
+        data = response.json()
+        match_list = data.get('matches', [])
+        
+        if not match_list:
+            return "📭 Abhi koi live matches nahi mil rahe hain."
+
+        final_msg = "🏏 *LIVE CRICKET SCORES* 🏏\n\n"
+
+        # Hum pehle 5 matches ka data nikalenge
+        for item in match_list[:5]:
+            match = item.get('match', {})
+            info = match.get('matchInfo', {})
+            score = match.get('matchScore', {})
+
+            t1 = info.get('team1', {}).get('teamSName', 'T1')
+            t2 = info.get('team2', {}).get('teamSName', 'T2')
+            status = info.get('status', 'Status unavailable')
+
+            # Match Score Formatting
+            if score:
+                # Team 1 Score
+                s1 = score.get('team1Score', {}).get('inngs1', {})
+                runs1 = s1.get('runs', 0)
+                wkts1 = s1.get('wickets', 0)
+                ovrs1 = s1.get('overs', 0)
+
+                # Team 2 Score
+                s2 = score.get('team2Score', {}).get('inngs1', {})
+                runs2 = s2.get('runs', 0)
+                wkts2 = s2.get('wickets', 0)
+                ovrs2 = s2.get('overs', 0)
+
+                match_text = (f"⭐ *{t1} vs {t2}*\n"
+                              f"🔹 {t1}: {runs1}/{wkts1} ({ovrs1})\n"
+                              f"🔹 {t2}: {runs2}/{wkts2} ({ovrs2})\n"
+                              f"📢 _{status}_\n\n")
+            else:
+                # Agar match abhi shuru nahi hua (Preview/Toss)
+                match_text = (f"⭐ *{t1} vs {t2}*\n"
+                              f"📢 _{status}_\n\n")
+            
+            final_msg += match_text
+
+        return final_msg
+
+    except Exception as e:
+        return f"⚠️ Error aa gaya: {str(e)}"
+
+# 3. Bot Command Handlers
+@bot.message_handler(commands=['start', 'help'])
+def welcome(message):
+    bot.reply_to(message, "Welcome! Live cricket score dekhne ke liye `/score` likhein.", parse_mode="Markdown")
+
 @bot.message_handler(commands=['score'])
 def send_score(message):
-    score_update = get_live_scores()
-    bot.reply_to(message, score_update, parse_mode="Markdown")
+    bot.send_chat_action(message.chat.id, 'typing')
+    result = fetch_cricbuzz_scores()
+    bot.send_message(message.chat.id, result, parse_mode="Markdown")
 
-# 4. Flask Route (For Render/Deployment)
-@app.route('/')
-def index():
-    return "Bot is Running!"
-
-if __name__ == "__main__":
-    # Bot ko background mein start karein
-    print("Bot starting...")
-    import threading
-    threading.Thread(target=bot.infinity_polling).start()
-    
-    # Flask app ko port par run karein
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
+# 4. Start Bot
+print("Bot is running...")
+bot.infinity_polling()
